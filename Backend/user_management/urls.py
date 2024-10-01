@@ -10,13 +10,17 @@ urlpatterns = [
          name="ticket-order-create"),
     path('order/detail/<str:ticket_order_id>/',
          views.TicketOrderDetailView.as_view(), name="ticket-order-detail"),
-#     path('razorpay_order', views.RazorpayPaymentView.as_view(), name='razorpay_order'),
-#     path('razorpay_callback', views.RazorpayCallback.as_view(),
-#          name='razorpay_callback'),
-    path('list/order/<int:id>', views.TicketOrderListView.as_view(), name='ticketOrder'),
-    path('filter/bus/<int:start_id>/<int:end_id>', views.UserAvailableRouteView.as_view(), name='busOrder'),
-    path('avail/date/<int:route_id>', views.AvailableDateView.as_view(), name='available_date'),
+    path('list/order/<int:id>',
+         views.TicketOrderListView.as_view(), name='ticketOrder'),
+    path('filter/bus/<int:start_id>/<int:end_id>',
+         views.UserAvailableRouteView.as_view(), name='busOrder'),
+    path('avail/date/<int:route_id>',
+         views.AvailableDateView.as_view(), name='available_date'),
 
-#     !This is of no use
+    #     !This is of no use
     path('update/<int:id>', views.UpdateUsers.as_view(), name='UpdateUsers'),
+
+    path("payment/create-checkout-session/<str:ticket_id>",
+         views.StripeCheckoutView.as_view(), name="payment"),
+    path("payment/webhook", views.stripe_webhook),
 ]

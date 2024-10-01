@@ -25,9 +25,9 @@ class TicketOrder(models.Model):
         Route, on_delete=models.CASCADE, related_name="order_route")
     status = models.CharField(
         max_length=25, choices=STATUS_CHOICES, default='PENDING')
-    sub_total = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    tax = models.DecimalField(max_digits=5, decimal_places=2, null=True)
-    total = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    sub_total = models.DecimalField(max_digits=10, decimal_places=0, null=True)
+    tax = models.DecimalField(max_digits=5, decimal_places=0, null=True)
+    total = models.DecimalField(max_digits=10, decimal_places=0, null=True)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -51,7 +51,7 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     provider_order_id = models.CharField(
         max_length=40, null=False, blank=False)
-    payment_id = models.CharField(max_length=36, null=False, blank=False)
+    payment_id = models.CharField(max_length=255, null=False, blank=False)
     signature_id = models.CharField(max_length=128, null=False, blank=False)
     # provider_order_id = models.CharField(max_length=64)
     created = models.DateTimeField(auto_now_add=True)

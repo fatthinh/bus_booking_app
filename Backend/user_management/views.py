@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from account.models import Account
 from vendor.models import Route, BusDetail
 from rest_framework import generics
@@ -9,14 +9,19 @@ from vendor.serializers import RouteWayPointDetailSerializer
 from .serializers import UserAvailableRouteView
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import APIView, View
 from datetime import datetime, timedelta
 import json
 from decouple import config
-import razorpay
-
+import stripe
+from django.views.decorators.csrf import csrf_exempt
+from django.core.mail import send_mail
+from django.http import HttpResponse
 
 # Create your views here.
+stripe.api_key = config('STRIPE_SECRET_KEY')
+
+
 class UserDetail(generics.RetrieveAPIView):
     # permission_classes = [IsAuthenticated]
     queryset = Account.objects.all()
@@ -48,118 +53,6 @@ class TicketOrderDetailView(generics.RetrieveAPIView):
     serializer_class = TicketDetailSerializer
     queryset = TicketOrder.objects.all()
     lookup_field = 'ticket_order_id'
-
-
-# # Razor pay
-
-
-# # Get Razorpay Key id and secret for authorize razorpay client.
-# RAZOR_KEY_ID = config('RAZOR_PAY_KEY_ID')
-# RAZOR_KEY_SECRET = config('RAZOR_PAY_SECRET_KEY')
-
-# # Creating RazorPay Client instance.
-# client = razorpay.Client(auth=(RAZOR_KEY_ID, RAZOR_KEY_SECRET))
-
-
-# class RazorpayPaymentView(APIView):
-
-#     http_method_names = ('post',)
-
-#     @staticmethod
-#     def post(request, *args, **kwargs):
-
-#         # Take Order Id from frontend and get all order info from Database.
-#         order_id = request.data.get('order_id', None)
-#         quantity = request.data.get('quantity', 1)
-#         # Here We are Using Static Order Details for Demo.
-#         amount = request.data.get('total', None)
-
-#         # Create Order
-#         razorpay_order = client.order.create(
-#             {"amount": int(amount) * 100, "currency": "INR",
-#              "payment_capture": "1"}
-#         )
-
-#         try:
-#             ticketOrder = TicketOrder.objects.get(ticket_order_id=order_id)
-#             bus = ticketOrder.route_id.bus_detail
-#             ticketOrder.quantity = quantity
-#             ticketOrder.save()
-#             bus.available_seats = bus.available_seats - quantity
-#             bus.save()
-
-#         except:
-#             Response({'error': 'Wrong order id'})
-#         if Payment.objects.filter(ticket=ticketOrder).exists():
-#             Payment.objects.get(ticket=ticketOrder).delete()
-
-#         # Save the order in DB
-#         Payment.objects.create(
-#             amount=amount, provider_order_id=razorpay_order["id"], ticket=ticketOrder)
-
-#         data = {
-#             "merchantId": RAZOR_KEY_ID,
-#             "amount": amount,
-#             "currency": 'INR',
-#             "orderId": razorpay_order["id"],
-#         }
-
-#         # save order Details to frontend
-#         return Response(data, status=status.HTTP_200_OK)
-
-
-# class RazorpayCallback(APIView):
-
-#     @staticmethod
-#     def post(request, *args, **kwargs):
-#         response = request.data['data']
-#         if "razorpay_signature" in response:
-
-#             # Verifying Payment Signature
-#             data = client.utility.verify_payment_signature(response)
-#             # if we get here True signature
-#             if data:
-#                 # razorpay_payment = RazorpayPayment.objects.get(order_id=response['razorpay_order_id'])
-#                 payment_object = Payment.objects.get(
-#                     provider_order_id=response['razorpay_order_id'])
-#                 print(payment_object)
-#                 payment_object.status = 'Success'
-#                 payment_object.payment_id = response['razorpay_payment_id']
-#                 payment_object.signature_id = response['razorpay_signature']
-#                 payment_object.save()
-#                 order = TicketOrder.objects.get(id=payment_object.ticket.id)
-#                 order.status = 'Delivered'
-#                 order.total = payment_object.amount
-#                 order.save()
-#                 print(order.status, '\n\n\n', order)
-
-#                 return Response({'status': 'Payment Done'}, status=status.HTTP_200_OK)
-#             else:
-#                 return Response({'status': 'Signature Mismatch!'}, status=status.HTTP_400_BAD_REQUEST)
-
-#         # Handling failed payments
-#         else:
-#             error_code = response['error[code]']
-#             error_description = response['error[description]']
-#             error_source = response['error[source]']
-#             error_reason = response['error[reason]']
-#             error_metadata = json.loads(response['error[metadata]'])
-
-#             razorpay_payment = Payment.objects.get(
-#                 provider_order_id=error_metadata['order_id'])
-#             razorpay_payment.payment_id = error_metadata['payment_id']
-#             razorpay_payment.signature_id = "None"
-#             razorpay_payment.status = 'Failure'
-#             razorpay_payment.save()
-
-#             error_status = {
-#                 'error_code': error_code,
-#                 'error_description': error_description,
-#                 'error_source': error_source,
-#                 'error_reason': error_reason,
-#             }
-
-#             return Response({'error_data': error_status}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class TicketOrderListView(generics.ListAPIView):
@@ -228,7 +121,7 @@ class AvailableDateView(APIView):
             start_stop = int(request.GET.get('start_stop'))
             end_stop = int(request.GET.get('end_stop'))
         except ValueError:
-            return Response({'error': 'Invalid start_stop or end_stop ID format'}, status=400)
+            return Response({'error': 'Invalid start_stop or end_stop ID format'}, status=status.HTTP_400_BAD_REQUEST)
         route_detail = Route.objects.get(id=route_id)
         points = self.serializer_class(route_detail).data
         for i in points['list_stops']:
@@ -251,7 +144,8 @@ class AvailableDateView(APIView):
             date_time = start_datetime(
                 current_date, start_stop['reaching_time'])
             day = date_time.strftime('%A')
-            list_dates.append({'date_time': date_time, 'day': day, 'end_date_time':end_date_time})
+            list_dates.append(
+                {'date_time': date_time, 'day': date_time.day, 'end_date_time': end_date_time})
             current_date += timedelta(days=1)
         return Response(list_dates, status=status.HTTP_200_OK)
 
@@ -261,3 +155,95 @@ class UpdateUsers(generics.UpdateAPIView):
     serializer_class = UserDetailSerializer
     queryset = Account.objects.all()
     lookup_field = 'id'
+
+
+# Stripe payment
+class StripeCheckoutView(APIView):
+    def post(self, request, *args, **kwargs):
+        ticket_id = self.kwargs["ticket_id"]
+        ticket = TicketOrder.objects.get(ticket_order_id=ticket_id)
+
+        try:
+            bus = ticket.route_id.bus_detail
+            bus.available_seats = bus.available_seats - ticket.quantity
+            bus.save()
+            # ticket.quantity = quantity
+            ticket.save()
+
+            print(bus)
+
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[
+                    {
+                        'price_data': {
+                            'currency': 'vnd',
+                            'unit_amount': int(ticket.route_id.price * ticket.quantity),
+                            'product_data': {
+                                'name': ticket.route_id,
+                            },
+
+                        },
+                        'quantity': ticket.quantity,
+                    },
+                ],
+                metadata={
+                    "provider_order_id": ticket_id
+                },
+                mode='payment',
+                success_url=config("SITE_URL") + '/success/',
+                cancel_url=config("SITE_URL") + '/cancel/',
+            )
+
+            if Payment.objects.filter(ticket=ticket).exists():
+                Payment.objects.get(ticket=ticket).delete()
+            Payment.objects.create(amount=int(
+                ticket.route_id.price * ticket.quantity), provider_order_id=ticket_id, ticket=ticket)
+
+            return redirect(checkout_session.url)
+
+        except:
+            return Response(
+                {'error': 'Something went wrong when creating stripe checkout session'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    endpoint_secret = config("STRIPE_ENDPOINT_SECRET")
+    payload = request.body
+    sig_header = request.META["HTTP_STRIPE_SIGNATURE"]
+    # event = None
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        return HttpResponse(status=400)
+
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return HttpResponse(status=400)
+
+    # Handle the checkout.session.completed event
+    if event["type"] == "checkout.session.completed":
+        session = event['data']['object']  # Retrieve session data
+        provider_order_id = session['metadata']['provider_order_id']  # Access metadata
+
+        payment_obj = Payment.objects.get(provider_order_id=provider_order_id)
+        payment_obj.status = "Success"
+        payment_obj.payment_id = session["id"]
+        payment_obj.method = "Stripe"
+        payment_obj.save()
+
+        order = TicketOrder.objects.get(id=payment_obj.ticket.id)
+        order.status = "Delivered"
+        order.total = payment_obj.amount
+        order.save()
+        print("Payment was successful.")
+
+        # TODO: run some custom code here
+    return HttpResponse(status=200)

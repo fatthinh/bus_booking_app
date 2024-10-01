@@ -163,8 +163,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-# CSRF_TRUSTED_ORIGINS = ['https://NaviGo.lunar-edge.online', 'http://localhost:5173']
-
+CSRF_TRUSTED_ORIGINS = ['http://localhost:5173']
 # CORS_ALLOW_ALL_ORIGINS = True
 
 REST_FRAMEWORK = {

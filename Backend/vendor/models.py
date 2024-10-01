@@ -30,7 +30,7 @@ class Route(models.Model):
         BusStop, on_delete=models.CASCADE, related_name='source_routes')
     destination = models.ForeignKey(
         BusStop, on_delete=models.CASCADE, related_name='destination_routes')
-    price = models.DecimalField(max_digits=5, decimal_places=2)
+    price = models.DecimalField(max_digits=18, decimal_places=0)
     bus_detail = models.ForeignKey(
         BusDetail, on_delete=models.CASCADE, blank=False)
     starting_time = models.TimeField()
