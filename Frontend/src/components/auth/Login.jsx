@@ -104,7 +104,7 @@ function Login() {
   return (
     <div>
       <ToastContainer />
-      <form className="form" method='POST' onSubmit={handleLoginSubmit}>
+      <form className="form bg-white shadow-lg w-[448px]" method='POST' onSubmit={handleLoginSubmit}>
 
         {fields.map((field, index) => <div key={index}><InputField {...field} /></div>)}
 

@@ -292,7 +292,7 @@ function UserMap() {
                       {!user.isAuthenticated && (
                         <div className="ml-3 my-5 bg-yellow-600 p-1 w-20 rounded-xl cursor-pointer">
                           <div className="text-xs leading-4 font-semibold text-center text-green-100">
-                            Login before order
+                            Đăng nhập
                           </div>
                           {/* <div className="uppercase text-xs leading-4 font-semibold text-center text-green-100" onClick={() => handleSubmit(res, starting_stop, ending_stop)}>Buy</div> */}
                         </div>

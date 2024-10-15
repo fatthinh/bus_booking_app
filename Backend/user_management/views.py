@@ -63,7 +63,7 @@ class TicketOrderListView(generics.ListAPIView):
         user_id = self.kwargs.get('id')
         print(user_id)
         queryset = TicketOrder.objects.filter(
-            user_id=user_id, status='Delivered')
+            user_id=user_id, status='Success')
         return queryset
 
 
@@ -71,8 +71,6 @@ class UserAvailableRouteView(APIView):
     serializer_class = UserAvailableRouteView
 
     def get(self, request, start_id, end_id):
-        print(start_id, end_id)
-
         # Bus Start from start_id and End at end_id
         route1 = Route.objects.filter(
             origin__id=start_id, destination__id=end_id)
@@ -162,15 +160,14 @@ class StripeCheckoutView(APIView):
     def post(self, request, *args, **kwargs):
         ticket_id = self.kwargs["ticket_id"]
         ticket = TicketOrder.objects.get(ticket_order_id=ticket_id)
+        quantity = int(request.POST.get('quantity'))
 
         try:
             bus = ticket.route_id.bus_detail
-            bus.available_seats = bus.available_seats - ticket.quantity
+            bus.available_seats = bus.available_seats - quantity
             bus.save()
-            # ticket.quantity = quantity
+            ticket.quantity = quantity
             ticket.save()
-
-            print(bus)
 
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
@@ -178,7 +175,7 @@ class StripeCheckoutView(APIView):
                     {
                         'price_data': {
                             'currency': 'vnd',
-                            'unit_amount': int(ticket.route_id.price * ticket.quantity),
+                            'unit_amount': int(ticket.route_id.price),
                             'product_data': {
                                 'name': ticket.route_id,
                             },
@@ -231,7 +228,8 @@ def stripe_webhook(request):
     # Handle the checkout.session.completed event
     if event["type"] == "checkout.session.completed":
         session = event['data']['object']  # Retrieve session data
-        provider_order_id = session['metadata']['provider_order_id']  # Access metadata
+        # Access metadata
+        provider_order_id = session['metadata']['provider_order_id']
 
         payment_obj = Payment.objects.get(provider_order_id=provider_order_id)
         payment_obj.status = "Success"
@@ -240,7 +238,7 @@ def stripe_webhook(request):
         payment_obj.save()
 
         order = TicketOrder.objects.get(id=payment_obj.ticket.id)
-        order.status = "Delivered"
+        order.status = "Success"
         order.total = payment_obj.amount
         order.save()
         print("Payment was successful.")

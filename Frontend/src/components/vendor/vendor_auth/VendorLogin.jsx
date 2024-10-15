@@ -98,13 +98,8 @@ function VendorLogin() {
                 className={`xl:max-w-3xl ${darkMode ? "bg-black" : "bg-white"
                     }  w-full p-5 sm:p-10 rounded-md`}
             >
-                <h1
-                    className={`text-center text-xl sm:text-3xl font-semibold ${darkMode ? "text-white" : "text-black"
-                        }`}
-                >
-                    {"✨            "}Welcome to NaviGo{"                  ✨"}
-                </h1>
-                <div className="w-full mt-8">
+                <h1>Đăng nhập</h1>
+                <div className="w-[442px] mt-8">
                     <form className="mx-auto max-w-xs sm:max-w-md md:max-w-lg flex flex-col gap-4">
                         <div className="flex flex-col sm:flex-row gap-3">
                         </div>
